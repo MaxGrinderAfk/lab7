@@ -20,7 +20,6 @@ import {
 import {
     Add as AddIcon,
     Delete as DeleteIcon,
-    School as StudentIcon,
     Book as SubjectIcon,
     Grade as GradeIcon
 } from "@mui/icons-material";
@@ -92,7 +91,6 @@ const InfoItem = styled.div`
 
 export default function MarkPage() {
     const [marks, setMarks] = useState([]);
-    const [students, setStudents] = useState({});
     const [subjects, setSubjects] = useState({});
     const [studentId, setStudentId] = useState("");
     const [subjectId, setSubjectId] = useState("");
@@ -106,47 +104,63 @@ export default function MarkPage() {
         severity: "success"
     });
 
-    const fetchStudents = async () => {
-        try {
-            const res = await studentApi.getStudents();
-            const studentsMap = {};
-            res.data.forEach(student => {
-                studentsMap[student.id] = student.name || `Студент #${student.id}`;
-            });
-            setStudents(studentsMap);
-        } catch (error) {
-            showSnackbar("Ошибка при загрузке студентов", "error");
-        }
-    };
-
     const fetchSubjects = async () => {
         try {
             const res = await subjectApi.getSubjects();
             const subjectsMap = {};
             res.data.forEach(subject => {
-                subjectsMap[subject.id] = subject.name || `Предмет #${subject.id}`;
+                subjectsMap[String(subject.id)] = subject.name || `Предмет #${subject.id}`;
             });
             setSubjects(subjectsMap);
+            return subjectsMap;
         } catch (error) {
             showSnackbar("Ошибка при загрузке предметов", "error");
+            return {};
         }
     };
 
-    const fetchMarks = async () => {
-        setLoading(true);
+    const fetchMarks = async (subjectsData) => {
         try {
             const res = await markApi.getMarks();
-            setMarks(Array.from(res.data));
+            const marksData = Array.from(res.data);
+
+            for (const mark of marksData) {
+                if (mark.subjectId !== undefined && mark.subjectId !== null) {
+                    const subjectIdStr = String(mark.subjectId);
+
+                    if (!subjectsData[subjectIdStr]) {
+                        try {
+                            const subjectRes = await subjectApi.getSubject(mark.subjectId);
+                            if (subjectRes && subjectRes.data) {
+                                subjectsData[subjectIdStr] = subjectRes.data.name || `Предмет #${mark.subjectId}`;
+                            } else {
+                                subjectsData[subjectIdStr] = `Предмет #${mark.subjectId}`;
+                            }
+                        } catch (error) {
+                            subjectsData[subjectIdStr] = `Предмет #${mark.subjectId}`;
+                        }
+                    }
+                }
+            }
+
+            setSubjects({...subjectsData});
+            setMarks(marksData);
+            return marksData;
         } catch (error) {
             showSnackbar("Ошибка при загрузке оценок", "error");
-        } finally {
-            setLoading(false);
+            return [];
         }
     };
 
     useEffect(() => {
         const fetchData = async () => {
-            await Promise.all([fetchMarks(), fetchStudents(), fetchSubjects()]);
+            setLoading(true);
+            try {
+                const subjectsData = await fetchSubjects();
+                await fetchMarks(subjectsData);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchData();
     }, []);
@@ -158,12 +172,33 @@ export default function MarkPage() {
         }
 
         try {
+            const parsedStudentId = parseInt(studentId);
+            const parsedSubjectId = parseInt(subjectId);
+            const parsedValue = parseInt(value);
+
             await markApi.createMark({
-                studentId: parseInt(studentId),
-                subjectId: parseInt(subjectId),
-                value: parseInt(value)
+                studentId: parsedStudentId,
+                subjectId: parsedSubjectId,
+                value: parsedValue
             });
-            await fetchMarks();
+
+            const subjectsData = {...subjects};
+            const subjectIdStr = String(parsedSubjectId);
+
+            if (!subjectsData[subjectIdStr]) {
+                try {
+                    const subjectData = await subjectApi.getSubject(parsedSubjectId);
+                    if (subjectData && subjectData.data) {
+                        subjectsData[subjectIdStr] = subjectData.data.name || `Предмет #${parsedSubjectId}`;
+                        setSubjects({...subjectsData});
+                    }
+                } catch (error) {
+                    subjectsData[subjectIdStr] = `Предмет #${parsedSubjectId}`;
+                    setSubjects({...subjectsData});
+                }
+            }
+
+            await fetchMarks(subjectsData);
             setStudentId("");
             setSubjectId("");
             setValue("");
@@ -204,12 +239,12 @@ export default function MarkPage() {
         return "error";
     };
 
-    const getStudentName = (studentId) => {
-        return students[studentId] || `Студент #${studentId}`;
-    };
-
     const getSubjectName = (subjectId) => {
-        return subjects[subjectId] || `Предмет #${subjectId}`;
+        if (subjectId === undefined || subjectId === null) {
+            return "Предмет не указан";
+        }
+        const subjectIdStr = String(subjectId);
+        return subjects[subjectIdStr] || `Предмет #${subjectId}`;
     };
 
     return (
@@ -235,9 +270,6 @@ export default function MarkPage() {
                             onChange={(e) => setStudentId(e.target.value)}
                             variant="outlined"
                             size="small"
-                            InputProps={{
-                                startAdornment: <StudentIcon color="action" sx={{ mr: 1 }} />,
-                            }}
                         />
                     </Grid>
 
@@ -250,9 +282,6 @@ export default function MarkPage() {
                             onChange={(e) => setSubjectId(e.target.value)}
                             variant="outlined"
                             size="small"
-                            InputProps={{
-                                startAdornment: <SubjectIcon color="action" sx={{ mr: 1 }} />,
-                            }}
                         />
                     </Grid>
 
@@ -265,9 +294,6 @@ export default function MarkPage() {
                             onChange={(e) => setValue(e.target.value)}
                             variant="outlined"
                             size="small"
-                            InputProps={{
-                                startAdornment: <GradeIcon color="action" sx={{ mr: 1 }} />,
-                            }}
                         />
                     </Grid>
 
@@ -335,7 +361,7 @@ export default function MarkPage() {
                                         <InfoItem>
                                             <SubjectIcon fontSize="small" />
                                             <Typography variant="body2">
-                                                Предмет: {getSubjectName(mark.subjectId)}
+                                                {getSubjectName(mark.subjectId)}
                                             </Typography>
                                         </InfoItem>
                                     </CardContent>

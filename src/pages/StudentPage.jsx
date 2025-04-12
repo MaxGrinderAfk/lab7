@@ -14,7 +14,9 @@ import {
     DialogContent,
     DialogTitle,
     Snackbar,
-    Alert
+    Alert,
+    Box,
+    Chip
 } from "@mui/material";
 import {
     Add as AddIcon,
@@ -22,7 +24,8 @@ import {
     Save as SaveIcon,
     Person as PersonIcon,
     AccessTime as AgeIcon,
-    Group as GroupIcon
+    Group as GroupIcon,
+    Grade as GradeIcon
 } from "@mui/icons-material";
 import styled from "@emotion/styled";
 import * as studentApi from "../services/studentService";
@@ -96,6 +99,33 @@ const ButtonContainer = styled.div`
     margin-top: 16px;
 `;
 
+const SectionTitle = styled(Typography)`
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+`;
+
+const InfoBox = styled(Box)`
+    padding: 12px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    margin-top: 8px;
+`;
+
+const MarkItem = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: #fff;
+    border-radius: 4px;
+    margin: 4px 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+`;
+
 export default function StudentPage() {
     const [students, setStudents] = useState([]);
     const [name, setName] = useState("");
@@ -109,13 +139,15 @@ export default function StudentPage() {
         message: "",
         severity: "success"
     });
+    const [updatingStudentId, setUpdatingStudentId] = useState(null);
 
     const fetchStudents = async () => {
         setLoading(true);
         try {
             const res = await studentApi.getStudents();
-            setStudents(Array.from(res.data));
+            setStudents(res.data);
         } catch (error) {
+            console.error("Ошибка при загрузке студентов:", error);
             showSnackbar("Ошибка при загрузке студентов", "error");
         } finally {
             setLoading(false);
@@ -138,14 +170,16 @@ export default function StudentPage() {
             const newStudent = {
                 name,
                 age: parseInt(age),
-                group: groupId ? { id: parseInt(groupId) } : null
+                group: groupId && groupId.trim() !== "" ? { id: parseInt(groupId) } : null
             };
 
             setStudents(prev => [
                 ...prev,
                 {
                     ...newStudent,
-                    id: tempId
+                    id: tempId,
+                    subjects: [],
+                    marks: []
                 }
             ]);
 
@@ -162,31 +196,46 @@ export default function StudentPage() {
             setGroupId("");
             showSnackbar("Студент успешно добавлен", "success");
         } catch (error) {
+            console.error("Ошибка при добавлении студента:", error);
             setStudents(prev => prev.filter(st => st.id !== tempId));
             showSnackbar("Ошибка при добавлении студента", "error");
         }
     };
 
-    const handleUpdate = async (studentId, newName, newAge, newGroupId) => {
-        try {
-            const studentToUpdate = {
-                id: studentId,
-                name: newName,
-                age: parseInt(newAge),
-                group: newGroupId ? { id: parseInt(newGroupId) } : null
-            };
+    const handleUpdate = async (studentId) => {
+        if (updatingStudentId === studentId) return;
 
-            const res = await studentApi.updateStudent(studentId, studentToUpdate);
+        setUpdatingStudentId(studentId);
+
+        try {
+            const studentToUpdate = students.find(s => s.id === studentId);
+
+            if (!studentToUpdate) {
+                showSnackbar("Студент не найден", "error");
+                return;
+            }
+
+            const updatedName = studentToUpdate.name || "";
+            const updatedAge = studentToUpdate.age !== undefined && studentToUpdate.age !== ""
+                ? parseInt(studentToUpdate.age)
+                : "";
+
+            await studentApi.updateStudent(studentId, updatedName, updatedAge);
 
             setStudents(prev =>
                 prev.map(st =>
-                    st.id === studentId ? res.data : st
+                    st.id === studentId
+                        ? { ...st, name: updatedName, age: updatedAge }
+                        : st
                 )
             );
 
             showSnackbar("Данные студента обновлены", "success");
         } catch (error) {
-            showSnackbar("Ошибка при обновлении данных", "error");
+            console.error("Ошибка при обновлении данных:", error);
+            showSnackbar(`Ошибка при обновлении: ${error.message || "неизвестная ошибка"}`, "error");
+        } finally {
+            setUpdatingStudentId(null);
         }
     };
 
@@ -202,29 +251,29 @@ export default function StudentPage() {
             setOpenDialog(false);
             showSnackbar("Студент удален", "success");
         } catch (error) {
+            console.error("Ошибка при удалении:", error);
             showSnackbar("Ошибка при удалении студента", "error");
         }
     };
 
     const handleNameChange = (id, newName) => {
-        const updated = [...students];
-        const index = updated.findIndex(st => st.id === id);
-        updated[index].name = newName;
-        setStudents(updated);
+        const newStudents = students.map(st => {
+            if (st.id === id) {
+                return {...st, name: newName};
+            }
+            return st;
+        });
+        setStudents(newStudents);
     };
 
     const handleAgeChange = (id, newAge) => {
-        const updated = [...students];
-        const index = updated.findIndex(st => st.id === id);
-        updated[index].age = newAge;
-        setStudents(updated);
-    };
-
-    const handleGroupChange = (id, newGroupId) => {
-        const updated = [...students];
-        const index = updated.findIndex(st => st.id === id);
-        updated[index].group = newGroupId ? { id: parseInt(newGroupId) } : null;
-        setStudents(updated);
+        const newStudents = students.map(st => {
+            if (st.id === id) {
+                return {...st, age: newAge};
+            }
+            return st;
+        });
+        setStudents(newStudents);
     };
 
     const showSnackbar = (message, severity) => {
@@ -233,6 +282,11 @@ export default function StudentPage() {
 
     const handleCloseSnackbar = () => {
         setSnackbar({ ...snackbar, open: false });
+    };
+
+    const getSubjectName = (subjectId) => {
+        const student = students.find(s => s.id === studentToDelete);
+        return student?.subjects?.find(s => s.id === subjectId)?.name || subjectId;
     };
 
     return (
@@ -341,6 +395,7 @@ export default function StudentPage() {
                                                 color="error"
                                                 onClick={() => confirmDelete(student.id)}
                                                 size="small"
+                                                disabled={updatingStudentId === student.id}
                                             >
                                                 <DeleteIcon />
                                             </IconButton>
@@ -352,10 +407,11 @@ export default function StudentPage() {
                                                 <TextField
                                                     fullWidth
                                                     label="Имя"
-                                                    value={student.name}
+                                                    value={student.name || ""}
                                                     onChange={(e) => handleNameChange(student.id, e.target.value)}
                                                     variant="outlined"
                                                     size="small"
+                                                    disabled={updatingStudentId === student.id}
                                                 />
                                             </InfoItem>
 
@@ -365,34 +421,59 @@ export default function StudentPage() {
                                                     fullWidth
                                                     label="Возраст"
                                                     type="number"
-                                                    value={student.age}
+                                                    value={student.age || ""}
                                                     onChange={(e) => handleAgeChange(student.id, e.target.value)}
                                                     variant="outlined"
                                                     size="small"
+                                                    disabled={updatingStudentId === student.id}
                                                 />
                                             </InfoItem>
 
-                                            <InfoItem>
-                                                <GroupIcon fontSize="small" />
-                                                <TextField
-                                                    fullWidth
-                                                    label="ID группы"
-                                                    type="number"
-                                                    value={student.group?.id || ""}
-                                                    onChange={(e) => handleGroupChange(student.id, e.target.value)}
-                                                    variant="outlined"
-                                                    size="small"
-                                                    placeholder="Нет группы"
-                                                />
-                                            </InfoItem>
+                                            {student.group && (
+                                                <InfoItem>
+                                                    <GroupIcon fontSize="small" />
+                                                    <TextField
+                                                        fullWidth
+                                                        label="Группа"
+                                                        value={`${student.group.name} (ID: ${student.group.id})`}
+                                                        variant="outlined"
+                                                        size="small"
+                                                        disabled
+                                                    />
+                                                </InfoItem>
+                                            )}
                                         </EditContainer>
+
+                                        <SectionTitle variant="subtitle1">
+                                            <GradeIcon fontSize="small" />
+                                            Оценки:
+                                        </SectionTitle>
+                                        <InfoBox>
+                                            {student.marks?.length > 0 ? (
+                                                student.marks.map(mark => (
+                                                    <MarkItem key={mark.id}>
+                                                        <Typography variant="body2">
+                                                            {mark.value}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="textSecondary">
+                                                            ({getSubjectName(mark.subjectId)})
+                                                        </Typography>
+                                                    </MarkItem>
+                                                ))
+                                            ) : (
+                                                <Typography variant="body2" color="textSecondary">
+                                                    Нет оценок
+                                                </Typography>
+                                            )}
+                                        </InfoBox>
 
                                         <ButtonContainer>
                                             <Button
                                                 variant="contained"
                                                 color="primary"
-                                                startIcon={<SaveIcon />}
-                                                onClick={() => handleUpdate(student.id, student.name, student.age, student.group?.id)}
+                                                startIcon={updatingStudentId === student.id ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                                                onClick={() => handleUpdate(student.id)}
+                                                disabled={updatingStudentId === student.id}
                                                 sx={{
                                                     borderRadius: '8px',
                                                     bgcolor: '#1976d2',
@@ -400,7 +481,7 @@ export default function StudentPage() {
                                                 }}
                                                 fullWidth
                                             >
-                                                Сохранить
+                                                {updatingStudentId === student.id ? "Сохранение..." : "Сохранить"}
                                             </Button>
                                         </ButtonContainer>
                                     </CardContent>

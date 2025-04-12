@@ -9,3 +9,5 @@ export const getAverageBySubject = (subjectId) => api.get(`/marks/average/subjec
 export const deleteSpecificMark = (params) =>
     api.delete("/marks/delete-specific", { params });
 export const deleteMark = (markId) => api.delete(`/marks/${markId}`);
+export const getStudent = (id) => api.get(`/marks/students/${id}`);
+export const getSubject = (id) => api.get(`/marks/subjects/${id}`);
