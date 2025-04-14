@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-    TextField,
     Button,
     Paper,
     IconButton,
@@ -12,7 +11,11 @@ import {
     Snackbar,
     Alert,
     Box,
-    InputAdornment
+    InputAdornment,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem
 } from "@mui/material";
 import {
     Link as LinkIcon,
@@ -52,16 +55,42 @@ const ResultsGrid = styled.div`
 `;
 
 export default function StudentSubjectsPage() {
-    const [studentId, setStudentId] = useState("");
-    const [subjectId, setSubjectId] = useState("");
+    // Поля для имен
+    const [studentName, setStudentName] = useState("");
+    const [subjectName, setSubjectName] = useState("");
+
+    // Списки для выпадающих меню
+    const [availableStudents, setAvailableStudents] = useState([]);
+    const [availableSubjects, setAvailableSubjects] = useState([]);
+
+    // Результаты запросов
     const [subjects, setSubjects] = useState([]);
-    const [students, setStudents] = useState([]);
+
+    // Состояния UI
     const [loading, setLoading] = useState(false);
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: "",
         severity: "success"
     });
+
+    useEffect(() => {
+        // Загрузка списков студентов и предметов при монтировании компонента
+        const fetchLists = async () => {
+            try {
+                const [studentsRes, subjectsRes] = await Promise.all([
+                    api.getAllStudents(),
+                    api.getAllSubjects()
+                ]);
+                setAvailableStudents(studentsRes.data);
+                setAvailableSubjects(subjectsRes.data);
+            } catch (error) {
+                showSnackbar("Ошибка загрузки списков студентов и предметов", "error");
+            }
+        };
+
+        fetchLists();
+    }, []);
 
     const showSnackbar = (message, severity) => {
         setSnackbar({ open: true, message, severity });
@@ -71,46 +100,88 @@ export default function StudentSubjectsPage() {
         setSnackbar(prev => ({ ...prev, open: false }));
     };
 
-    const fetchStudentSubjects = async () => {
-        if (!studentId) {
-            showSnackbar("Введите ID студента", "warning");
-            return;
-        }
-
+    // Новый метод для получения студента с предметами по ID
+    const fetchStudentWithSubjects = async (studentId) => {
         setLoading(true);
         try {
-            const res = await api.getSubjectsByStudent(studentId);
-            setSubjects(res.data);
-        } catch {
-            showSnackbar("Ошибка загрузки предметов", "error");
+            const res = await api.getStudentWithSubjects(studentId);
+            setSubjects(res.data.subjects || []);
+            if (!res.data.subjects || res.data.subjects.length === 0) {
+                showSnackbar("У студента нет предметов", "info");
+            }
+        } catch (error) {
+            showSnackbar("Ошибка загрузки студента с предметами", "error");
             setSubjects([]);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleLink = async () => {
-        if (!studentId || !subjectId) {
-            showSnackbar("Заполните оба поля", "warning");
+    // Модифицированный метод поиска студента по имени
+    const fetchStudentSubjectsByName = async () => {
+        if (!studentName) {
+            showSnackbar("Выберите имя студента", "warning");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // Находим студента в списке по имени
+            const student = availableStudents.find(s => s.name === studentName);
+
+            if (!student) {
+                showSnackbar("Студент не найден", "error");
+                setSubjects([]);
+                setLoading(false);
+                return;
+            }
+
+            // Вызываем API с ID студента
+            await fetchStudentWithSubjects(student.id);
+        } catch (error) {
+            showSnackbar("Ошибка при поиске студента", "error");
+            setSubjects([]);
+            setLoading(false);
+        }
+    };
+
+    const handleLinkByName = async () => {
+        if (!studentName || !subjectName) {
+            showSnackbar("Выберите студента и предмет", "warning");
             return;
         }
 
         try {
-            await api.addSubjectToStudent(studentId, subjectId);
-            await fetchStudentSubjects();
-            setSubjectId("");
+            await api.addSubjectToStudentByNames(studentName, subjectName);
+
+            // Находим студента в списке по имени для получения ID
+            const student = availableStudents.find(s => s.name === studentName);
+            if (student) {
+                await fetchStudentWithSubjects(student.id);
+            } else {
+                await fetchStudentSubjectsByName(); // Фолбэк на старый метод
+            }
+
             showSnackbar("Связь успешно добавлена", "success");
-        } catch {
+        } catch (error) {
             showSnackbar("Ошибка создания связи", "error");
         }
     };
 
-    const handleUnlink = async (subjectId) => {
+    const handleUnlinkByName = async (subject) => {
         try {
-            await api.removeSubjectFromStudent(studentId, subjectId);
-            await fetchStudentSubjects();
+            await api.removeSubjectFromStudentByNames(studentName, subject.name);
+
+            // Находим студента в списке по имени для получения ID
+            const student = availableStudents.find(s => s.name === studentName);
+            if (student) {
+                await fetchStudentWithSubjects(student.id);
+            } else {
+                await fetchStudentSubjectsByName(); // Фолбэк на старый метод
+            }
+
             showSnackbar("Связь успешно удалена", "success");
-        } catch {
+        } catch (error) {
             showSnackbar("Ошибка удаления связи", "error");
         }
     };
@@ -126,40 +197,54 @@ export default function StudentSubjectsPage() {
 
             <SectionPaper elevation={0}>
                 <Typography variant="h6" gutterBottom sx={{ color: 'text.secondary' }}>
-                    Создание новой связи
+                    Создание новой связи по имени
                 </Typography>
 
                 <Grid container spacing={3} alignItems="center">
                     <Grid item xs={12} md={4}>
-                        <TextField
-                            fullWidth
-                            label="ID студента"
-                            value={studentId}
-                            onChange={(e) => setStudentId(e.target.value)}
-                            InputProps={{
-                                startAdornment: (
+                        <FormControl fullWidth>
+                            <InputLabel id="student-select-label">Студент</InputLabel>
+                            <Select
+                                labelId="student-select-label"
+                                value={studentName}
+                                label="Студент"
+                                onChange={(e) => setStudentName(e.target.value)}
+                                startAdornment={
                                     <InputAdornment position="start">
                                         <PersonIcon color="action" />
                                     </InputAdornment>
-                                ),
-                            }}
-                        />
+                                }
+                            >
+                                {availableStudents.map((student) => (
+                                    <MenuItem key={student.id} value={student.name}>
+                                        {student.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
-                        <TextField
-                            fullWidth
-                            label="ID предмета"
-                            value={subjectId}
-                            onChange={(e) => setSubjectId(e.target.value)}
-                            InputProps={{
-                                startAdornment: (
+                        <FormControl fullWidth>
+                            <InputLabel id="subject-select-label">Предмет</InputLabel>
+                            <Select
+                                labelId="subject-select-label"
+                                value={subjectName}
+                                label="Предмет"
+                                onChange={(e) => setSubjectName(e.target.value)}
+                                startAdornment={
                                     <InputAdornment position="start">
                                         <BookIcon color="action" />
                                     </InputAdornment>
-                                ),
-                            }}
-                        />
+                                }
+                            >
+                                {availableSubjects.map((subject) => (
+                                    <MenuItem key={subject.id} value={subject.name}>
+                                        {subject.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                     </Grid>
 
                     <Grid item xs={12} md={4}>
@@ -167,7 +252,7 @@ export default function StudentSubjectsPage() {
                             fullWidth
                             variant="contained"
                             startIcon={<LinkIcon />}
-                            onClick={handleLink}
+                            onClick={handleLinkByName}
                             sx={{ py: 1.5, borderRadius: 2 }}
                         >
                             Связать
@@ -179,7 +264,7 @@ export default function StudentSubjectsPage() {
                     <Button
                         variant="outlined"
                         startIcon={<PersonIcon />}
-                        onClick={fetchStudentSubjects}
+                        onClick={fetchStudentSubjectsByName}
                     >
                         Показать предметы студента
                     </Button>
@@ -196,7 +281,7 @@ export default function StudentSubjectsPage() {
                         <SectionPaper elevation={0}>
                             <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
                                 <PersonIcon color="primary" sx={{ mr: 1 }} />
-                                Предметы студента #{studentId}
+                                {`Предметы студента "${studentName}"`}
                             </Typography>
 
                             <ResultsGrid>
@@ -211,7 +296,7 @@ export default function StudentSubjectsPage() {
                                             </Typography>
                                         </CardContent>
                                         <IconButton
-                                            onClick={() => handleUnlink(subject.id)}
+                                            onClick={() => handleUnlinkByName(subject)}
                                             sx={{ position: 'absolute', top: 8, right: 8 }}
                                             color="error"
                                         >
@@ -222,43 +307,20 @@ export default function StudentSubjectsPage() {
                             </ResultsGrid>
                         </SectionPaper>
                     )}
-
-                    {students.length > 0 && (
-                        <SectionPaper elevation={0}>
-                            <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-                                <BookIcon color="primary" sx={{ mr: 1 }} />
-                                Студенты предмета #{subjectId}
-                            </Typography>
-
-                            <ResultsGrid>
-                                {students.map((student) => (
-                                    <Card key={student.id}>
-                                        <CardContent>
-                                            <Typography variant="h6">
-                                                {student.name}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                Возраст: {student.age}
-                                            </Typography>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </ResultsGrid>
-                        </SectionPaper>
-                    )}
                 </>
             )}
 
             <Snackbar
                 open={snackbar.open}
-                autoHideDuration={4000}
+                autoHideDuration={6000}
                 onClose={handleCloseSnackbar}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
                 <Alert
-                    severity={snackbar.severity}
-                    sx={{ width: '100%' }}
                     onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    elevation={6}
+                    variant="filled"
                 >
                     {snackbar.message}
                 </Alert>

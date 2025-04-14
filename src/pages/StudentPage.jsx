@@ -16,7 +16,12 @@ import {
     Snackbar,
     Alert,
     Box,
-    Chip
+    Chip,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    InputAdornment
 } from "@mui/material";
 import {
     Add as AddIcon,
@@ -29,6 +34,7 @@ import {
 } from "@mui/icons-material";
 import styled from "@emotion/styled";
 import * as studentApi from "../services/studentService";
+import * as groupApi from "../services/groupService";
 
 const Container = styled.div`
     max-width: 1280px;
@@ -131,7 +137,9 @@ export default function StudentPage() {
     const [name, setName] = useState("");
     const [age, setAge] = useState("");
     const [groupId, setGroupId] = useState("");
+    const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadingGroups, setLoadingGroups] = useState(false);
     const [openDialog, setOpenDialog] = useState(false);
     const [studentToDelete, setStudentToDelete] = useState(null);
     const [snackbar, setSnackbar] = useState({
@@ -154,8 +162,25 @@ export default function StudentPage() {
         }
     };
 
+    const fetchGroups = async () => {
+        setLoadingGroups(true);
+        try {
+            const res = await groupApi.getGroups();
+            setGroups(res.data);
+        } catch (error) {
+            console.error("Ошибка при загрузке групп:", error);
+            showSnackbar("Ошибка при загрузке групп", "error");
+        } finally {
+            setLoadingGroups(false);
+        }
+    };
+
     useEffect(() => {
-        fetchStudents();
+        const fetchData = async () => {
+            await fetchStudents();
+            await fetchGroups();
+        };
+        fetchData();
     }, []);
 
     const handleAdd = async () => {
@@ -170,7 +195,7 @@ export default function StudentPage() {
             const newStudent = {
                 name,
                 age: parseInt(age),
-                group: groupId && groupId.trim() !== "" ? { id: parseInt(groupId) } : null
+                group: groupId ? { id: parseInt(groupId) } : null
             };
 
             setStudents(prev => [
@@ -333,18 +358,33 @@ export default function StudentPage() {
                     </Grid>
 
                     <Grid item xs={12} sm={6} md={3}>
-                        <TextField
-                            fullWidth
-                            label="ID группы"
-                            type="number"
-                            value={groupId}
-                            onChange={(e) => setGroupId(e.target.value)}
-                            variant="outlined"
-                            size="small"
-                            InputProps={{
-                                startAdornment: <GroupIcon color="action" sx={{ mr: 1 }} />,
-                            }}
-                        />
+                        <FormControl fullWidth size="small">
+                            <InputLabel id="group-select-label">Группа</InputLabel>
+                            <TextField
+                                select
+                                label="Группа"
+                                value={groupId}
+                                onChange={(e) => setGroupId(e.target.value)}
+                                disabled={loadingGroups}
+                                variant="outlined"
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <GroupIcon color="action" />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            >
+                                <MenuItem value="">
+                                    <em>Без группы</em>
+                                </MenuItem>
+                                {groups.map(group => (
+                                    <MenuItem key={group.id} value={group.id}>
+                                        {group.name}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        </FormControl>
                     </Grid>
 
                     <Grid item xs={12} sm={6} md={3}>

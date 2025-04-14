@@ -7,14 +7,18 @@ import {
     Typography,
     CircularProgress,
     Grid,
-    Card,
-    CardContent,
     Dialog,
     DialogActions,
     DialogContent,
     DialogTitle,
     Snackbar,
-    Alert
+    Alert,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow
 } from "@mui/material";
 import {
     Add as AddIcon,
@@ -41,23 +45,6 @@ const ActionBar = styled(Paper)`
     margin-bottom: 24px;
     border-radius: 12px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-`;
-
-const SubjectsList = styled.div`
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
-    margin-top: 24px;
-`;
-
-const SubjectCard = styled(Card)`
-    border-radius: 12px;
-    transition: transform 0.2s, box-shadow 0.2s;
-
-    &:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
-    }
 `;
 
 export default function SubjectPage() {
@@ -202,24 +189,42 @@ export default function SubjectPage() {
                             </Typography>
                         </Paper>
                     ) : (
-                        <SubjectsList>
-                            {subjects.map((subject) => (
-                                <SubjectCard key={subject.id}>
-                                    <CardContent>
-                                        <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                                            Предмет #{subject.id}: {subject.name}
-                                        </Typography>
-                                        <IconButton
-                                            color="error"
-                                            onClick={() => confirmDelete(subject.id)}
-                                            size="small"
+                        <TableContainer component={Paper} sx={{ boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)', borderRadius: '12px' }}>
+                            <Table>
+                                <TableHead sx={{ backgroundColor: '#f8f9fa' }}>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 'bold', color: '#1a237e' }}>ID</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', color: '#1a237e' }}>Название предмета</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 'bold', color: '#1a237e' }}>Действия</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {subjects.map((subject) => (
+                                        <TableRow
+                                            key={subject.id}
+                                            sx={{
+                                                '&:hover': {
+                                                    backgroundColor: '#f5f5f5',
+                                                },
+                                                transition: 'background-color 0.2s'
+                                            }}
                                         >
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    </CardContent>
-                                </SubjectCard>
-                            ))}
-                        </SubjectsList>
+                                            <TableCell>{subject.id}</TableCell>
+                                            <TableCell>{subject.name}</TableCell>
+                                            <TableCell align="right">
+                                                <IconButton
+                                                    color="error"
+                                                    onClick={() => confirmDelete(subject.id)}
+                                                    size="small"
+                                                >
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
                     )}
                 </>
             )}

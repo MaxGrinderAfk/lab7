@@ -1,22 +1,27 @@
 import api from "./api";
 
-export const addSubjectToStudent = (studentId, subjectId) =>
-    api.post("/student-subjects", null, { params: { studentId, subjectId } });
+export const getAllStudents = () => {
+    return api.get("/student-subjects/students");
+};
 
-export const addSubjectsToStudentBulk = (studentId, subjectIds) =>
-    api.post("/student-subjects/bulk", subjectIds, { params: { studentId } });
+export const getAllSubjects = () => {
+    return api.get("/student-subjects/subjects");
+};
 
-export const removeSubjectFromStudent = (studentId, subjectId) =>
-    api.delete("/student-subjects", { params: { studentId, subjectId } });
+// Получение связей по имени
+export const getSubjectsByStudentName = (studentName) => {
+    return api.get(`/student-subjects/students/name/${encodeURIComponent(studentName)}/subjects`);
+};
 
-export const getSubjectsByStudent = (studentId) =>
-    api.get(`/student-subjects/${studentId}/subjects`);
+export const getStudentWithSubjects = (studentId) => {
+    return api.get(`/student-subjects/student/${studentId}/with-subjects`);
+};
 
-export const getStudentsBySubject = (subjectId) =>
-    api.get(`/student-subjects/${subjectId}/students`);
+// Управление связями по имени
+export const addSubjectToStudentByNames = (studentName, subjectName) => {
+    return api.post(`/student-subjects/students/name/${encodeURIComponent(studentName)}/subjects/name/${encodeURIComponent(subjectName)}`);
+};
 
-export const getStudentWithSubjects = (studentId) =>
-    api.get(`/student-subjects/student/${studentId}/with-subjects`);
-
-export const getSubjectWithStudents = (subjectId) =>
-    api.get(`/student-subjects/subject/${subjectId}/with-students`);
+export const removeSubjectFromStudentByNames = (studentName, subjectName) => {
+    return api.delete(`/student-subjects/students/name/${encodeURIComponent(studentName)}/subjects/name/${encodeURIComponent(subjectName)}`);
+};

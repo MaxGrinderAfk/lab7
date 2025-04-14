@@ -11,7 +11,14 @@ import {
     IconButton,
     Chip,
     CircularProgress,
-    Snackbar
+    Snackbar,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper
 } from "@mui/material";
 import {
     Add,
@@ -46,26 +53,6 @@ const ActionBar = styled.div`
     background: #f8f9fa;
     padding: 16px;
     border-radius: 12px;
-`;
-
-const GroupGrid = styled.div`
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 24px;
-    margin-top: 24px;
-`;
-
-const GroupCard = styled.div`
-    background: white;
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    transition: transform 0.2s, box-shadow 0.2s;
-
-    &:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
-    }
 `;
 
 function GroupDetailsDialog({ open, group, onClose }) {
@@ -211,38 +198,56 @@ export default function GroupPage() {
                     <CircularProgress size={60} thickness={4} />
                 </div>
             ) : (
-                <GroupGrid>
-                    {groups
-                        .filter(group => group.name.toLowerCase().includes(searchTerm.toLowerCase()))
-                        .map(group => (
-                            <GroupCard key={group.id}>
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    marginBottom: 16
-                                }}>
-                                    <h3 style={{ margin: 0, color: '#1a237e' }}>{group.name}</h3>
-                                    <div>
-                                        <IconButton onClick={() => handleViewGroup(group.id)}>
-                                            <Visibility fontSize="small" />
-                                        </IconButton>
-                                        <IconButton color="error" onClick={() => handleDeleteGroup(group.id)}>
-                                            <Delete fontSize="small" />
-                                        </IconButton>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <Chip
-                                        label={group.status || 'Активна'}
-                                        size="small"
-                                        color={group.status === 'Архив' ? 'default' : 'success'}
-                                    />
-                                </div>
-                            </GroupCard>
-                        ))}
-                </GroupGrid>
+                <TableContainer component={Paper} sx={{ boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)', borderRadius: '12px' }}>
+                    <Table>
+                        <TableHead sx={{ backgroundColor: '#f8f9fa' }}>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 'bold', color: '#1a237e' }}>Название группы</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', color: '#1a237e' }}>Статус</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#1a237e' }}>Действия</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {groups
+                                .filter(group => group.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                                .map((group) => (
+                                    <TableRow
+                                        key={group.id}
+                                        sx={{
+                                            '&:hover': {
+                                                backgroundColor: '#f5f5f5',
+                                            },
+                                            transition: 'background-color 0.2s'
+                                        }}
+                                    >
+                                        <TableCell>{group.name}</TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={group.status || 'Активна'}
+                                                size="small"
+                                                color={group.status === 'Архив' ? 'default' : 'success'}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            <IconButton onClick={() => handleViewGroup(group.id)}>
+                                                <Visibility fontSize="small" />
+                                            </IconButton>
+                                            <IconButton color="error" onClick={() => handleDeleteGroup(group.id)}>
+                                                <Delete fontSize="small" />
+                                            </IconButton>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            {groups.filter(group => group.name.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={3} sx={{ textAlign: 'center', py: 3 }}>
+                                        Группы не найдены
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
             )}
 
             <Dialog
