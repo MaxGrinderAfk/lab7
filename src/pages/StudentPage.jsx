@@ -484,29 +484,6 @@ export default function StudentPage() {
                                             )}
                                         </EditContainer>
 
-                                        <SectionTitle variant="subtitle1">
-                                            <GradeIcon fontSize="small" />
-                                            Оценки:
-                                        </SectionTitle>
-                                        <InfoBox>
-                                            {student.marks?.length > 0 ? (
-                                                student.marks.map(mark => (
-                                                    <MarkItem key={mark.id}>
-                                                        <Typography variant="body2">
-                                                            {mark.value}
-                                                        </Typography>
-                                                        <Typography variant="caption" color="textSecondary">
-                                                            ({getSubjectName(mark.subjectId)})
-                                                        </Typography>
-                                                    </MarkItem>
-                                                ))
-                                            ) : (
-                                                <Typography variant="body2" color="textSecondary">
-                                                    Нет оценок
-                                                </Typography>
-                                            )}
-                                        </InfoBox>
-
                                         <ButtonContainer>
                                             <Button
                                                 variant="contained"
